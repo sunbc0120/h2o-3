@@ -229,6 +229,7 @@ class H2OAutoML(object):
         self._leader_id = None
         self._leaderboard = None
         self._event_log = None
+        self._state_json = None
         if sort_metric == "AUTO":
             self.sort_metric = None
         else:
@@ -283,8 +284,8 @@ class H2OAutoML(object):
     #---------------------------------------------------------------------------
     # Training AutoML
     #---------------------------------------------------------------------------
-    def train(self, x = None, y = None, training_frame = None, fold_column = None, 
-              weights_column = None, validation_frame = None, leaderboard_frame = None, blending_frame = None):
+    def train(self, x=None, y=None, training_frame=None, fold_column=None,
+              weights_column=None, validation_frame=None, leaderboard_frame=None, blending_frame=None):
         """
         Begins an AutoML task, a background task that automatically builds a number of models
         with various algorithms and tracks their performance in a leaderboard. At any point 
@@ -399,12 +400,12 @@ class H2OAutoML(object):
             if ignored_columns is not None:
                 input_spec['ignored_columns'] = list(ignored_columns)
 
-        automl_build_params = dict(input_spec = input_spec)
+        automl_build_params = dict(input_spec=input_spec)
 
         # NOTE: if the user hasn't specified some block of parameters don't send them!
         # This lets the back end use the defaults.
         automl_build_params['build_control'] = self.build_control
-        automl_build_params['build_models']  = self.build_models
+        automl_build_params['build_models'] = self.build_models
 
         resp = h2o.api('POST /99/AutoMLBuilder', json=automl_build_params)
         if 'job' not in resp:
@@ -479,6 +480,7 @@ class H2OAutoML(object):
         self._leader_id = state['leader_id']
         self._leaderboard = state['leaderboard']
         self._event_log = state['event_log']
+        self._state_json = state['json']
         return self._leader_id is not None
 
     def _get_params(self):
@@ -516,7 +518,7 @@ class H2OAutoML(object):
 
         event_log = None
         if should_fetch('event_log'):
-            event_log = H2OAutoML._fetch_table(state_json['user_feedback_table'], key=project_name+"_eventlog", progress_bar=False)
+            event_log = H2OAutoML._fetch_table(state_json['event_log_table'], key=project_name+"_eventlog", progress_bar=False)
 
         return dict(
             project_name=project_name,
