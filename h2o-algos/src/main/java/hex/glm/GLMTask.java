@@ -1764,7 +1764,57 @@ public abstract class GLMTask  {
       _sumExpChunk.set(r.cid,Math.exp(_etas[_c]-maxrow)/sumExp);
     }
   }
-  
+
+  /**
+   * This class will calculate the 1/(sum exp) and the log (sum exp) for multinomial classes.
+   */
+  public static class GLMMultinomialSpeedUpUpdate extends FrameTask2<GLMMultinomialSpeedUpUpdate> {
+    private final double [] _beta; // updated  value of beta
+    private transient double [] _sparseOffsets;
+    private transient double [] _etas;
+    private transient int _nclass;            // number of multinomial classes
+    double[][] _betaPerClass;                 // store beta as a 2-D array
+
+    public GLMMultinomialSpeedUpUpdate(DataInfo dinfo, Key jobKey, double [] beta, int nclass) {
+      super(null, dinfo, jobKey);
+      _beta = beta;
+      _nclass = nclass;
+      _betaPerClass = ArrayUtils.convertTo2DMatrix(beta,dinfo.fullN()+1);
+    }
+
+    @Override public void chunkInit(){
+      // initialize
+      _sparseOffsets = MemoryManager.malloc8d(_beta.length);
+      _etas = MemoryManager.malloc8d(_beta.length);
+      if(_sparse) {
+        for(int i = 0; i < _nclass; ++i) { // performed for each multinomial class
+          _sparseOffsets[i] = GLM.sparseOffset(_betaPerClass[i], _dinfo);  // calculated per class
+        }
+      }
+    }
+
+    private transient Chunk _sumExpChunk;
+    private transient Chunk _logSumExpChunk;
+
+    @Override public void map(Chunk [] chks) {
+      _sumExpChunk = chks[chks.length-2];
+      _logSumExpChunk = chks[chks.length-1];
+      super.map(chks);
+    }
+
+    @Override
+    protected void processRow(Row r) {
+      double sumExp = 0;
+      for(int i = 0; i < _nclass; ++i) {
+        _etas[i] = r.innerProduct(_betaPerClass[i]) + _sparseOffsets[i];
+        sumExp += Math.exp(_etas[i]);
+      }
+      _logSumExpChunk.set(r.cid,Math.log(sumExp));
+      _sumExpChunk.set(r.cid,1.0/sumExp);
+    }
+  }
+
+
   /**
    * One iteration of glm, computes weighted gram matrix and t(x)*y vector and t(y)*y scalar.
    *
@@ -1786,7 +1836,8 @@ public abstract class GLMTask  {
     //    final double _lambda;
     double wsum, wsumu;
     double _sumsqe;
-    int _c = -1;
+    int _c = -1;  // will represent number of multinomial classes during speedup
+    boolean _multiClassSpeedup = false;
 
     public  GLMIterationTask(Key jobKey, DataInfo dinfo, GLMWeightsFun glmw,double [] beta) {
       super(null,dinfo,jobKey);
@@ -1797,23 +1848,39 @@ public abstract class GLMTask  {
 
     public  GLMIterationTask(Key jobKey, DataInfo dinfo, GLMWeightsFun glmw, double [] beta, int c) {
       super(null,dinfo,jobKey);
-      _beta = beta;
+      _beta = beta; // beta contains all class coeffs stacked up for IRLSM_SPEEDUP multinomial
       _ymu = null;
       _glmf = glmw;
       _c = c;
     }
 
+    public  GLMIterationTask(Key jobKey, DataInfo[] dinfo, GLMWeightsFun glmw, double [] beta) {
+      super(null,dinfo[0],jobKey); // can only pass one DataInfo
+      _beta = beta;
+      _ymu = null;
+      _glmf = glmw;
+    }
+
     @Override public boolean handlesSparseData(){return true;}
 
     transient private double _sparseOffset;
+    transient private double[] _sparseOffsets;  // sparse offset for each class
 
     @Override
     public void chunkInit() {
       // initialize
-      _gram = new Gram(_dinfo.fullN(), _dinfo.largestCat(), _dinfo.numNums(), _dinfo._cats,true);
-      _xy = MemoryManager.malloc8d(_dinfo.fullN()+1); // + 1 is for intercept
-      if(_sparse)
-        _sparseOffset = GLM.sparseOffset(_beta,_dinfo);
+      _multiClassSpeedup = (_glmf._family.equals(Family.multinomial)&&((_dinfo.fullN()+1)*_c==_beta.length));
+      _gram = _multiClassSpeedup
+              ?new Gram(_beta.length, _dinfo.numNums(), true)
+              :new Gram(_dinfo.fullN(), _dinfo.largestCat(), _dinfo.numNums(), _dinfo._cats,true);
+      _xy = _multiClassSpeedup ?MemoryManager.malloc8d(_beta.length)
+              :MemoryManager.malloc8d(_dinfo.fullN()+1); // + 1 is for intercept
+      if(_sparse) {
+        if (_multiClassSpeedup)
+          _sparseOffsets = GLM.sparseOffset(_beta, _dinfo, _c);
+        _sparseOffset = GLM.sparseOffset(_beta, _dinfo);
+      }
+      
       _w = new GLMWeights();
     }
     
@@ -1825,39 +1892,51 @@ public abstract class GLMTask  {
     protected void processRow(Row r) { // called for every row in the chunk
       if(r.isBad() || r.weight == 0) return;
       ++_nobs;
-      double y = r.response(0);
-      _yy += y*y;
-      final int numStart = _dinfo.numStart();
-      double wz,w;
-      if(_glmf._family == Family.multinomial) {
-        y = (y == _c)?1:0;
-        double mu = r.response(1);
-        double eta = r.response(2);
-        double d = mu*(1-mu);
-        if(d == 0) d = 1e-10;
-        wz = r.weight * (eta * d + (y-mu));
-        w  = r.weight * d;
-      } else if(_beta != null) {
-        _glmf.computeWeights(y, r.innerProduct(_beta) + _sparseOffset, r.offset, r.weight, _w);
-        w = _w.w; // hessian without the xij xik part
-        wz = w*_w.z;
-        _likelihood += _w.l;
-      } else {
-        w = r.weight;
-        wz = w*(y - r.offset);
+      if (_multiClassSpeedup)
+        processMultinomialRow(r);
+      else {
+        double y = r.response(0);
+        _yy += y * y;
+        final int numStart = _dinfo.numStart();
+        double wz, w;
+        if (_glmf._family == Family.multinomial) {
+          y = (y == _c) ? 1 : 0;
+          double mu = r.response(1);
+          double eta = r.response(2);
+          double d = mu * (1 - mu);
+          if (d == 0) d = 1e-10;
+          wz = r.weight * (eta * d + (y - mu));
+          w = r.weight * d;
+        } else if (_beta != null) {
+          _glmf.computeWeights(y, r.innerProduct(_beta) + _sparseOffset, r.offset, r.weight, _w);
+          w = _w.w; // hessian without the xij xik part
+          wz = w * _w.z;
+          _likelihood += _w.l;
+        } else {
+          w = r.weight;
+          wz = w * (y - r.offset);
+        }
+        wsum += w;
+        wsumu += r.weight; // just add the user observation weight for the scaling.
+        for (int i = 0; i < r.nBins; ++i)
+          _xy[r.binIds[i]] += wz;
+        for (int i = 0; i < r.nNums; ++i) {
+          int id = r.numIds == null ? (i + numStart) : r.numIds[i];
+          double val = r.numVals[i];
+          _xy[id] += wz * val;
+        }
+        if (_dinfo._intercept)
+          _xy[_xy.length - 1] += wz;
+        _gram.addRow(r, w);
       }
-      wsum+=w;
-      wsumu+=r.weight; // just add the user observation weight for the scaling.
-      for(int i = 0; i < r.nBins; ++i)
-        _xy[r.binIds[i]] += wz;
-      for(int i = 0; i < r.nNums; ++i){
-        int id = r.numIds == null?(i + numStart):r.numIds[i];
-        double val = r.numVals[i];
-        _xy[id] += wz*val;
-      }
-      if(_dinfo._intercept)
-        _xy[_xy.length-1] += wz;
-      _gram.addRow(r,w);
+    }
+    
+    public void processMultinomialRow(Row r) {
+      double y =r.response(0);
+      double sumExp = r.response(1);
+      double logsumExp = r.response(2);
+      int numStart = _dinfo.numStart(); // start of numerical column index
+      
     }
 
     @Override

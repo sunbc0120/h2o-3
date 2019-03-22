@@ -661,6 +661,7 @@ public final class ComputationState {
 
     return res;
   }
+  
 
   GramXY _currGram;
   GLMModel.GLMWeightsFun _glmw;
@@ -670,7 +671,9 @@ public final class ComputationState {
   public GramXY computeGram(double [] beta, GLMParameters.Solver s){ // beta can contain coeff of all classes
     double obj_reg = _parms._obj_reg;
     boolean weighted = _parms._family != Family.gaussian || _parms._link != GLMParameters.Link.identity;
-    if(_parms._family == Family.multinomial) // no caching
+    if(_parms._family == Family.multinomial && s.equals(GLMParameters.Solver.IRLSM_SPEEDUP)) // no caching
+      return computeNewGram(activeDataMultinomial(),beta,s);
+    else if (_parms._family == Family.multinomial)
       return computeNewGram(activeDataMultinomial(_activeClass),beta,s);
     if(s != GLMParameters.Solver.COORDINATE_DESCENT)
       // only cache for solver==COD

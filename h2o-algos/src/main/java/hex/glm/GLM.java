@@ -750,8 +750,12 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
           if (!onlyIcpt)
             break;
         }
-        _state.setActiveClass(c);
-        // generate an array of ls
+        
+        if (s.equals(Solver.IRLSM_SPEEDUP))
+          _state.setActiveClass(_nclass); // set ActiveClass to be number of class for IRLSM_SPEEDUP
+        else
+          _state.setActiveClass(c);
+        // generate an array of ls, should it be only one with giant stacks of class coeffs
         LineSearchSolver[] ls = new LineSearchSolver[_nclass];
         for (int cIndex=0; cIndex < _nclass; cIndex++)
           ls[cIndex] = (_state.l1pen() == 0)
@@ -763,10 +767,10 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
 
           long t1 = System.currentTimeMillis();
           // generate prediction output of each class and store results in _adaptedFrame
-          new GLMMultinomialUpdate(_state.activeDataMultinomial(), 
-                  _job._key, beta, c).doAll(_state.activeDataMultinomial()._adaptedFrame);
-        new GLMMultinomialUpdate(_state.activeDataMultinomial(),
-                _job._key, beta, c).doAll(_state.activeDataMultinomial()._adaptedFrame);
+          new GLMMultinomialSpeedUpUpdate(_state.activeDataMultinomial(), 
+                  _job._key, beta, _nclass).doAll(_state.activeDataMultinomial()._adaptedFrame);
+      //  new GLMMultinomialUpdate(_state.activeDataMultinomial(),
+       //         _job._key, beta, c).doAll(_state.activeDataMultinomial()._adaptedFrame);
           long t2 = System.currentTimeMillis();
           ComputationState.GramXY gram = _state.computeGram(ls[c].get_betaAll(), s); // use ls.getX() to get only one class of coeffs.
           long t3 = System.currentTimeMillis();
@@ -1307,9 +1311,11 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
           removeLater(vecs[0]._key,vecs[1]._key);
         }
 
-        if (_parms._family == Family.ordinal)
+        if (_parms._family.equals(Family.ordinal))
           _dinfo.addResponse(new String[]{"__glm_ExpC", "__glm_ExpNPC"}, vecs); // store eta for class C and class C-1
-        else
+        else if (_parms._family.equals(Family.multinomial) && _parms._solver.equals(Solver.IRLSM_SPEEDUP))
+          _dinfo.addResponse(new String[]{"__glm_sumExp", "__glm_logSumExp"}, vecs);
+          else
           _dinfo.addResponse(new String[]{"__glm_sumExp", "__glm_maxRow"}, vecs);
       }
       
@@ -2008,6 +2014,19 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
       int ns = dinfo.numStart();
       for (int i = 0; i < dinfo._nums; ++i)
         etaOffset -= beta[i + ns] * dinfo._normSub[i] * dinfo._normMul[i];
+    }
+    return etaOffset;
+  }
+
+  protected static double[] sparseOffset(double[] beta, DataInfo dinfo, int nclass) {
+    double[] etaOffset = new double[nclass];
+    int coeffPClass = beta.length/nclass;
+    if (dinfo._normMul != null && dinfo._normSub != null && beta != null) {
+      int ns = dinfo.numStart();
+      for (int classInd = 0; classInd < nclass; classInd++) {
+        for (int i = 0; i < dinfo._nums; ++i)
+          etaOffset[classInd] -= beta[classInd*coeffPClass+i + ns] * dinfo._normSub[i] * dinfo._normMul[i];
+      }
     }
     return etaOffset;
   }
