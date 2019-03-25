@@ -56,6 +56,9 @@ public class ParseV3 extends RequestSchemaV3<Iced, ParseV3> {
   @API(help="Key-reference to an initialized instance of a Decryption Tool")
   public KeyV3.DecryptionToolKeyV3 decrypt_tool;
 
+  @API(help="Lines starting with the following character are ignored", direction=API.Direction.INPUT)
+  public String non_data_line_markers;
+
   // Output fields
   @API(help="Parse job", direction=API.Direction.OUTPUT)
   public JobV3 job;
