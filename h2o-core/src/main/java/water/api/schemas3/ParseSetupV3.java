@@ -73,7 +73,7 @@ public class ParseSetupV3 extends RequestSchemaV3<ParseSetup, ParseSetupV3> {
   @API(help="Total number of columns we would return with no column pagination", direction=API.Direction.INOUT)
   public int total_filtered_column_count;
 
-  @API(help="Lines starting with the following character are ignored", direction=API.Direction.INOUT)
+  @API(help="Custom characters to be treated as non-data line markers", direction=API.Direction.INOUT)
   public String non_data_line_markers;
 
   @API(help="Key-reference to an initialized instance of a Decryption Tool")
