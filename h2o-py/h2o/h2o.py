@@ -400,6 +400,7 @@ def import_file(path=None, destination_frame=None, parse=True, header=0, sep=Non
     :param pattern: Character string containing a regular expression to match file(s) in the folder if `path` is a
         directory.
     :param skipped_columns: an integer list of column indices to skip and not parsed into the final frame from the import file.
+    :param non_data_line_markers: A string containing custom characters to be treated as non-data line markers
 
     :returns: a new :class:`H2OFrame` instance.
 
@@ -592,6 +593,7 @@ def parse_setup(raw_frames, destination_frame=None, header=0, separator=None, co
     :param na_strings: A list of strings, or a list of lists of strings (one list per column), or a dictionary
         of column names to strings which are to be interpreted as missing values.
     :param skipped_columns: an integer lists of column indices to skip and not parsed into the final frame from the import file.
+    :param non_data_line_markers: A string containing custom characters to be treated as non-data line markers
 
     :returns: a dictionary containing parse parameters guessed by the H2O backend.
     """
