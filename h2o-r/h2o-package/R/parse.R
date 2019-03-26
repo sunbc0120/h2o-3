@@ -30,22 +30,25 @@
 #'        acquired by calling \link{h2o.decryptionSetup}.
 #' @param chunk_size size of chunk of (input) data in bytes
 #' @param skipped_columns a list of column indices to be excluded from parsing
+#' @param non_data_line_markers (Optional) A string containing custom characters to be treated as non-data line markers
 #' @seealso \link{h2o.importFile}, \link{h2o.parseSetup}
 #' @export
 h2o.parseRaw <- function(data, pattern="", destination_frame = "", header=NA, sep = "", col.names=NULL,
                          col.types=NULL, na.strings=NULL, blocking=FALSE, parse_type = NULL, chunk_size = NULL,
-                         decrypt_tool = NULL, skipped_columns = NULL) {
+                         decrypt_tool = NULL, skipped_columns = NULL, non_data_line_markers = NULL) {
   # Check and parse col.types in case col.types is supplied col.name = col.type vec
   if( length(names(col.types)) > 0 & typeof(col.types) != "list" ) {
     parse.params <- h2o.parseSetup(data, pattern="", destination_frame, header, sep, col.names, col.types = NULL,
                                    na.strings = na.strings, parse_type = parse_type, chunk_size = chunk_size,
-                                   decrypt_tool = decrypt_tool, skipped_columns=skipped_columns)
+                                   decrypt_tool = decrypt_tool, skipped_columns=skipped_columns,
+                                   non_data_line_markers = non_data_line_markers)
     idx = match(names(col.types), parse.params$column_names)
     parse.params$column_types[idx] = as.character(col.types)
   } else {
     parse.params <- h2o.parseSetup(data, pattern="", destination_frame, header, sep, col.names, col.types,
                                    na.strings = na.strings, parse_type = parse_type, chunk_size = chunk_size,
-                                   decrypt_tool = decrypt_tool, skipped_columns=skipped_columns)
+                                   decrypt_tool = decrypt_tool, skipped_columns=skipped_columns,
+                                   non_data_line_markers = non_data_line_markers)
   }
   for(w in parse.params$warnings){
     cat('WARNING:',w,'\n')
@@ -67,6 +70,9 @@ h2o.parseRaw <- function(data, pattern="", destination_frame = "", header=NA, se
             decrypt_tool = .decrypt_tool_id(parse.params$decrypt_tool),
             skipped_columns = paste0("[", paste(parse.params$skipped_columns, collapse=','), "]")
             )
+   if(!is.null(non_data_line_markers)){
+    parse.params <- append(parse.params,list(non_data_line_markers = non_data_line_markers))
+   }
 
   # Perform the parse
   res <- .h2o.__remoteSend(.h2o.__PARSE, method = "POST", .params = parse.params)
@@ -127,7 +133,8 @@ h2o.parseRaw <- function(data, pattern="", destination_frame = "", header=NA, se
 #' @seealso \link{h2o.parseRaw}
 #' @export
 h2o.parseSetup <- function(data, pattern="", destination_frame = "", header = NA, sep = "", col.names = NULL, col.types = NULL,
-                           na.strings = NULL, parse_type = NULL, chunk_size = NULL, decrypt_tool = NULL, skipped_columns=NULL) {
+                           na.strings = NULL, parse_type = NULL, chunk_size = NULL, decrypt_tool = NULL, skipped_columns=NULL,
+                           non_data_line_markers=NULL) {
 
   # Allow single frame or list of frames; turn singleton into a list
   if( is.H2OFrame(data) ) data <- list(data)
@@ -140,6 +147,8 @@ h2o.parseSetup <- function(data, pattern="", destination_frame = "", header = NA
   # begin the setup
   # setup the parse parameters here
   parseSetup.params <- list()
+  
+  if(!is.null(non_data_line_markers)) {parseSetup.params$non_data_line_markers = non_data_line_markers}
 
   if (!is.null(skipped_columns)) {
     skipped_columns = sort(skipped_columns)
@@ -267,7 +276,8 @@ h2o.parseSetup <- function(data, pattern="", destination_frame = "", header = NA
         delete_on_done     = TRUE,
         warnings           = parseSetup$warnings,
         decrypt_tool       = parseSetup$decrypt_tool,
-        skipped_columns    = parseSetup$skipped_columns
+        skipped_columns    = parseSetup$skipped_columns,
+        non_data_line_markers = parseSetup$non_data_line_markers
         )
 }
 
