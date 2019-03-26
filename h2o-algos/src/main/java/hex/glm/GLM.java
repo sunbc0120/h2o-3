@@ -747,8 +747,6 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         boolean onlyIcpt = true; 
         for (int classInd = 0; classInd < _nclass; classInd++) {
           onlyIcpt = onlyIcpt && (_state.activeDataMultinomial(c).fullN() == 0);
-          if (!onlyIcpt)
-            break;
         }
         
         if (s.equals(Solver.IRLSM_SPEEDUP))

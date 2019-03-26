@@ -1838,6 +1838,12 @@ public abstract class GLMTask  {
     double _sumsqe;
     int _c = -1;  // will represent number of multinomial classes during speedup
     boolean _multiClassSpeedup = false;
+    double[] _hessian;  // store hessian for multinomial speedup
+    double[] _wz;       // store wz for multinomial speedup
+    double[] _etas;     // store eta for all classes for multinomial speedup
+    double[] _probs;    // store probabilities for all classes for multinomial speedup
+    double[] _betaOneClass; // store beta for one multinomial class for multinomial speedup
+    int _coeffPClass;  // length of beta per class
 
     public  GLMIterationTask(Key jobKey, DataInfo dinfo, GLMWeightsFun glmw,double [] beta) {
       super(null,dinfo,jobKey);
@@ -1876,8 +1882,17 @@ public abstract class GLMTask  {
       _xy = _multiClassSpeedup ?MemoryManager.malloc8d(_beta.length)
               :MemoryManager.malloc8d(_dinfo.fullN()+1); // + 1 is for intercept
       if(_sparse) {
-        if (_multiClassSpeedup)
+        if (_multiClassSpeedup) {
           _sparseOffsets = GLM.sparseOffset(_beta, _dinfo, _c);
+          _coeffPClass = _beta.length/_c;
+            _hessian = new double[_c];
+            _wz = new double[_c];
+            _etas = new double[_c];
+            _probs = new double[_c];
+            _betaOneClass = new double[_beta.length/_c];
+            _beta_multinomial = new double[_c][_coeffPClass];
+            ArrayUtils.convertTo2DMatrix(_beta, _beta_multinomial);
+        }
         _sparseOffset = GLM.sparseOffset(_beta, _dinfo);
       }
       
@@ -1932,11 +1947,20 @@ public abstract class GLMTask  {
     }
     
     public void processMultinomialRow(Row r) {
-      double y =r.response(0);
-      double sumExp = r.response(1);
+
+      
+      int y =(int) r.response(0); // actual class label
+      double oneOversumExp = r.response(1);
       double logsumExp = r.response(2);
       int numStart = _dinfo.numStart(); // start of numerical column index
-      
+      generateEtasNProbs(y, r);
+    }
+    
+    public void generateEtasNProbs(int yresp, Row r) {
+      for (int classInd=0; classInd < _c; classInd++) {
+        _etas[classInd] = r.innerProduct(_beta_multinomial[classInd])+_sparseOffsets[classInd];
+        _probs[classInd] = Math.exp(_etas[classInd])*r.response(1);
+      }
     }
 
     @Override

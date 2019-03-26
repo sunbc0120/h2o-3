@@ -1409,6 +1409,20 @@ public class ArrayUtils {
     return res;
   }
 
+  public static double [][] convertTo2DMatrix(double [] x, double[][] x2d) {
+    assert x2d!= null;  // assert x2d is not null and contains the same number of elements as x
+    assert x2d[0] != null;
+    assert x.length == x2d.length*x2d[0].length;
+    
+    int N = x2d[0].length;
+    int len = x2d.length;
+    
+    for(int i = 0; i < len; ++i) {
+      System.arraycopy(x,i*N,x2d[i],0,N);
+    }
+    return x2d;
+  }
+
   public static double[] flat(double[][] arr) {
     if (arr == null) return null;
     if (arr.length == 0) return null;
