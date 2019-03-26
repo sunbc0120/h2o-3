@@ -1838,7 +1838,7 @@ public abstract class GLMTask  {
     double _sumsqe;
     int _c = -1;  // will represent number of multinomial classes during speedup
     boolean _multiClassSpeedup = false;
-    double[] _hessian;  // store hessian for multinomial speedup
+    double[][] _hessian;  // store hessian for multinomial speedup
     double[] _wz;       // store wz for multinomial speedup
     double[] _etas;     // store eta for all classes for multinomial speedup
     double[] _probs;    // store probabilities for all classes for multinomial speedup
@@ -1882,18 +1882,22 @@ public abstract class GLMTask  {
       _xy = _multiClassSpeedup ?MemoryManager.malloc8d(_beta.length)
               :MemoryManager.malloc8d(_dinfo.fullN()+1); // + 1 is for intercept
       if(_sparse) {
-        if (_multiClassSpeedup) {
+        if (_multiClassSpeedup)
           _sparseOffsets = GLM.sparseOffset(_beta, _dinfo, _c);
-          _coeffPClass = _beta.length/_c;
-            _hessian = new double[_c];
-            _wz = new double[_c];
-            _etas = new double[_c];
-            _probs = new double[_c];
-            _betaOneClass = new double[_beta.length/_c];
-            _beta_multinomial = new double[_c][_coeffPClass];
-            ArrayUtils.convertTo2DMatrix(_beta, _beta_multinomial);
-        }
-        _sparseOffset = GLM.sparseOffset(_beta, _dinfo);
+        else
+          _sparseOffset = GLM.sparseOffset(_beta, _dinfo);
+      }
+      if (_multiClassSpeedup) {
+        _coeffPClass = _beta.length/_c;
+        _hessian = new double[_c][];  // symmetric matrix, only need half of the elements
+        for (int classInd=0; classInd < _c; classInd++)
+          _hessian[classInd] = new double[classInd+1];
+        _wz = new double[_c];
+        _etas = new double[_c];
+        _probs = new double[_c];
+        _betaOneClass = new double[_beta.length/_c];
+        _beta_multinomial = new double[_c][_coeffPClass];
+        ArrayUtils.convertTo2DMatrix(_beta, _beta_multinomial);
       }
       
       _w = new GLMWeights();
@@ -1947,19 +1951,27 @@ public abstract class GLMTask  {
     }
     
     public void processMultinomialRow(Row r) {
-
-      
       int y =(int) r.response(0); // actual class label
       double oneOversumExp = r.response(1);
-      double logsumExp = r.response(2);
+
       int numStart = _dinfo.numStart(); // start of numerical column index
-      generateEtasNProbs(y, r);
+      generateEtasNProbs(oneOversumExp, r);
+      // update w, used for gram add row
+      for (int classInd1=0; classInd1 < _c; classInd1++) {
+        for (int classInd2 = 0; classInd2 <= classInd1; classInd2++) {
+          _hessian[classInd1][classInd2] = (classInd1==classInd2)?
+                  (_probs[classInd1]-_probs[classInd1]*_probs[classInd1]):
+                  (-_probs[classInd1]*_probs[classInd2]);
+        } 
+        _wz[classInd1] = (classInd1==y)?(_etas[y]* +1-_probs[y]):_probs[classInd1];
+      }
+      // update wz, used for _xy
     }
     
-    public void generateEtasNProbs(int yresp, Row r) {
+    public void generateEtasNProbs(double oneOverSumExp, Row r) {
       for (int classInd=0; classInd < _c; classInd++) {
-        _etas[classInd] = r.innerProduct(_beta_multinomial[classInd])+_sparseOffsets[classInd];
-        _probs[classInd] = Math.exp(_etas[classInd])*r.response(1);
+        _etas[classInd] = r.innerProduct(_beta_multinomial[classInd])+(_sparse?_sparseOffsets[classInd]:0);
+        _probs[classInd] = Math.exp(_etas[classInd])*oneOverSumExp;
       }
     }
 
