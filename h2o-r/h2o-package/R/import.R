@@ -55,7 +55,7 @@
 #' @param decrypt_tool (Optional) Specify a Decryption Tool (key-reference
 #'        acquired by calling \link{h2o.decryptionSetup}.
 #' @param skipped_columns a list of column indices to be skipped during parsing.
-#' @param custom_non_data_line_markers (Optional) If a line in imported file starts with any character in given string it will be imported. Empty string means all lines are imported, None means that default behaviour for given format will be used
+#' @param custom_non_data_line_markers (Optional) If a line in imported file starts with any character in given string it will NOT be imported. Empty string means all lines are imported, NULL means that default behaviour for given format will be used
 #' @seealso \link{h2o.import_sql_select}, \link{h2o.import_sql_table}, \link{h2o.parseRaw}
 #' @examples
 #' \donttest{
@@ -126,7 +126,7 @@ if(parse) {
     srcKey <- res$destination_frames
     return( h2o.parseRaw(data=.newH2OFrame(op="ImportFolder",id=srcKey,-1,-1),pattern=pattern, destination_frame=destination_frame,
             header=header, sep=sep, col.names=col.names, col.types=col.types, na.strings=na.strings, decrypt_tool=decrypt_tool,
-             skipped_columns=skipped_columns, custom_non_data_line_markers = custom_non_data_line_markers) )
+             skipped_columns=skipped_columns, custom_non_data_line_markers=custom_non_data_line_markers) )
 }
   myData <- lapply(res$destination_frames, function(x) .newH2OFrame( op="ImportFolder", id=x,-1,-1))  # do not gc, H2O handles these nfs:// vecs
   if(length(res$destination_frames) == 1L)

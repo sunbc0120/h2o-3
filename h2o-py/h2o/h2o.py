@@ -400,7 +400,7 @@ def import_file(path=None, destination_frame=None, parse=True, header=0, sep=Non
     :param pattern: Character string containing a regular expression to match file(s) in the folder if `path` is a
         directory.
     :param skipped_columns: an integer list of column indices to skip and not parsed into the final frame from the import file.
-    :param non_data_line_markers: If a line in imported file starts with any character in given string it will be imported. Empty string means all lines are imported, None means that default behaviour for given format will be used
+    :param custom_non_data_line_markers: If a line in imported file starts with any character in given string it will NOT be imported. Empty string means all lines are imported, None means that default behaviour for given format will be used
 
     :returns: a new :class:`H2OFrame` instance.
 
@@ -557,7 +557,7 @@ def import_sql_select(connection_url, select_query, username, password, optimize
 
 
 def parse_setup(raw_frames, destination_frame=None, header=0, separator=None, column_names=None,
-                column_types=None, na_strings=None, skipped_columns=None, custom_non_data_line_markers = None):
+                column_types=None, na_strings=None, skipped_columns=None, custom_non_data_line_markers=None):
     """
     Retrieve H2O's best guess as to what the structure of the data file is.
 
@@ -593,7 +593,7 @@ def parse_setup(raw_frames, destination_frame=None, header=0, separator=None, co
     :param na_strings: A list of strings, or a list of lists of strings (one list per column), or a dictionary
         of column names to strings which are to be interpreted as missing values.
     :param skipped_columns: an integer lists of column indices to skip and not parsed into the final frame from the import file.
-    :param custom_non_data_line_markers: If a line in imported file starts with any character in given string it will be imported. Empty string means all lines are imported, None means that default behaviour for given format will be used
+    :param custom_non_data_line_markers: If a line in imported file starts with any character in given string it will NOT be imported. Empty string means all lines are imported, None means that default behaviour for given format will be used
 
     :returns: a dictionary containing parse parameters guessed by the H2O backend.
     """
