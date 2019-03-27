@@ -69,23 +69,10 @@ public class ParseSetup extends Iced {
             ps._nonDataLineMarkers);
   }
 
-
   public static ParseSetup makeSVMLightSetup(){
     return new ParseSetup(SVMLight_INFO, ParseSetup.GUESS_SEP,
         false,ParseSetup.NO_HEADER,1,null,new byte[]{Vec.T_NUM},null,null,null, new ParseWriter.ParseErr[0], new byte[]{});
   }
-
-  public ParseSetup(ParserInfo parseType, byte sep, boolean singleQuotes, int checkHeader, int ncols, String[][] data, ParseWriter.ParseErr[] errs, int[] skipped_columns) {
-    this(parseType, sep, singleQuotes, checkHeader, ncols, null, null, null, null, data, errs, FileVec.DFLT_CHUNK_SIZE, skipped_columns);
-  }
-
-  public ParseSetup(ParserInfo parse_type, byte sep, boolean singleQuotes, int checkHeader, int ncols, String[] columnNames,
-                    byte[] ctypes, String[][] domains, String[][] naStrings, String[][] data, ParseWriter.ParseErr[] errs,
-                    int chunkSize, int[] skipped_columns) {
-    this(parse_type, sep, singleQuotes, checkHeader, ncols, columnNames, ctypes, domains, naStrings, data, errs,
-            chunkSize, null, skipped_columns, new byte[]{});
-  }
-
 
   // This method was called during guess setup, lot of things are null, like ctypes.
   // when it is called again, it either contains the guess column types or it will have user defined column types
