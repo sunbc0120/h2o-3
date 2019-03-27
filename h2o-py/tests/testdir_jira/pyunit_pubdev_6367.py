@@ -18,7 +18,7 @@ def pubdev_5394():
         assert df.nrows == len(l) - 1
 
         # No lines ignored, as non-data line markers are overridden/empty
-        df = h2o.import_file(tmp.name, header=1, non_data_line_markers='')
+        df = h2o.import_file(tmp.name, header=1, custom_non_data_line_markers='')
         assert df.nrows == len(l)
     finally:
         tmp.close()

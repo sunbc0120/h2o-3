@@ -74,7 +74,7 @@ public class ParseSetupV3 extends RequestSchemaV3<ParseSetup, ParseSetupV3> {
   public int total_filtered_column_count;
 
   @API(help="Custom characters to be treated as non-data line markers", direction=API.Direction.INOUT)
-  public String non_data_line_markers;
+  public String custom_non_data_line_markers;
 
   @API(help="Key-reference to an initialized instance of a Decryption Tool")
   public KeyV3.DecryptionToolKeyV3 decrypt_tool;

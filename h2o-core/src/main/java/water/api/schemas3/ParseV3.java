@@ -57,7 +57,7 @@ public class ParseV3 extends RequestSchemaV3<Iced, ParseV3> {
   public KeyV3.DecryptionToolKeyV3 decrypt_tool;
 
   @API(help="Custom characters to be treated as non-data line markers", direction=API.Direction.INPUT)
-  public String non_data_line_markers;
+  public String custom_non_data_line_markers;
 
   // Output fields
   @API(help="Parse job", direction=API.Direction.OUTPUT)

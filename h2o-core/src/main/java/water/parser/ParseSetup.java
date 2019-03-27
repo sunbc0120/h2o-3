@@ -11,7 +11,6 @@ import water.util.Log;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Map;
 
 import static water.parser.DefaultParserProviders.*;
 
@@ -161,7 +160,7 @@ public class ParseSetup extends Iced {
          new ParseWriter.ParseErr[0],
          ps.chunk_size,
             ps.decrypt_tool != null ? ps.decrypt_tool.key() : null, ps.skipped_columns,
-            ps.non_data_line_markers != null ? ps.non_data_line_markers.getBytes() : null);
+            ps.custom_non_data_line_markers != null ? ps.custom_non_data_line_markers.getBytes() : null);
   }
 
   /**
